@@ -120,12 +120,7 @@ static int _xmodem_putc(XMODEM_Obj *x, char c)
 
 	while (i--)
 	{
-		struct SCI_REGS *regs = (struct SCI_REGS *)x->sci;
-		if (regs->SCICTL2.bit.TXRDY) {
-			regs->SCITXBUF = c;
-			return 1;
-		}
-//		SCI_PUT_DATA(x->sci, c, return 1);
+		SCI_PUT_DATA(x->sci, c, return 1);
 
 		DELAY_US(10L);
 	}
