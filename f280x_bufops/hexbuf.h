@@ -7,6 +7,12 @@ extern "C" {
 
 #include "f280x_bufops/bufops.h"
 
+#define HEXBUF_USE_FLASHAPI 1
+
+#if HEXBUF_USE_FLASHAPI
+#define HEXBUF_SECTORS	(SECTORC|SECTORD)
+#endif
+
 //! \brief Defines the HEXBUF object
 //!
 typedef struct _HEXBUF_Obj_
@@ -15,9 +21,11 @@ typedef struct _HEXBUF_Obj_
 	long addr;
 	char token;
 	char buffer[5+130];
-#if HEXBUF_USE_FLASH
-	int16_t output[21];
+#if HEXBUF_USE_FLASHAPI
+	Uint16 output[16];
 	int outidx;
+	long outaddr;
+	int erased;
 #endif
 } HEXBUF_Obj;
 

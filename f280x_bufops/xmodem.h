@@ -46,23 +46,6 @@ extern "C" {
 #define XMODEM_WITH_CRC 1
 #endif
 
-/* Put XMODEM routines and data into RAM sections (xmodemramfuncs and xmodemramdata) */
-#ifndef XMODEM_USE_RAM
-#define XMODEM_USE_RAM 0
-#endif
-
-#define XMODEM_FUNCS_SECT "buframfuncs"
-#define XMODEM_DATA_SECT "buframdata"
-
-#if XMODEM_USE_RAM
-#ifndef XMODEM_FUNCS_SECT
-#define XMODEM_FUNCS_SECT 	"xmodemramfuncs"
-#endif
-#ifndef XMODEM_DATA_SECT
-#define XMODEM_DATA_SECT	"xmodemramdata"
-#endif
-#endif
-
 #define XMODEM_DEFAULT_RETRY 20
 
 /* Use old-style API with SCI regs and bit fields definitions */

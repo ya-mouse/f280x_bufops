@@ -1,16 +1,13 @@
 #include "DSP28x_Project.h"
 
+#include "f280x_bufops/canbuf.h"
+
 #if BUFFER_USE_RAM
 #define _INLINE 1
 #endif
 #include <stdlib.h>
 #include <string.h>
 
-#include "f280x_bufops/canbuf.h"
-
-#if BUFFER_USE_RAM
-#pragma CODE_SECTION(CANBUF_init, BUF_FUNCS_SECT)
-#endif
 CANBUF_Handle CANBUF_init(int base, const CANBUF_Mode_e mode, int msgid)
 {
 	static struct _CANBUF_Obj_ canbuf;
@@ -53,9 +50,6 @@ CANBUF_Handle CANBUF_init(int base, const CANBUF_Mode_e mode, int msgid)
     return (bufHandle);
 }
 
-#if BUFFER_USE_RAM
-#pragma CODE_SECTION(CANBUF_writer, BUF_FUNCS_SECT)
-#endif
 int CANBUF_writer(long data, int *buffer, int len)
 {
     //CANBUF_Obj *bufobj = (CANBUF_Obj *)data;
@@ -63,9 +57,6 @@ int CANBUF_writer(long data, int *buffer, int len)
     return 0;
 }
 
-#if BUFFER_USE_RAM
-#pragma CODE_SECTION(CANBUF_reader, BUF_FUNCS_SECT)
-#endif
 int CANBUF_reader(long data, int *buffer, int len)
 {
     //CANBUF_Obj *bufobj = (CANBUF_Obj *)data;
@@ -73,9 +64,6 @@ int CANBUF_reader(long data, int *buffer, int len)
     return len;
 }
 
-#if BUFFER_USE_RAM
-#pragma CODE_SECTION(CANBUF_reader, BUF_FUNCS_SECT)
-#endif
 int CANBUF_recv(CANBUF_Handle canbufHandle)
 {
     //CANBUF_Obj *bufobj = (CANBUF_Obj *)canbufHandle;

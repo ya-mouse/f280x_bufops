@@ -8,47 +8,6 @@
 
 #include "f280x_bufops/hexbuf.h"
 
-#if 0
-#if BUFFER_USE_RAM
-#pragma CODE_SECTION(xmemcpy, BUF_FUNCS_SECT)
-#endif
-void far *xmemcpy(void far *to, const void far *from, size_t n)
-{
-     register char far *rto   = (char far *) to;
-     register char far *rfrom = (char far *) from;
-     register unsigned int rn;
-     register unsigned int nn = (unsigned int) n;
-
-     /***********************************************************************/
-     /*  Assume that the size is < 64K and do the memcpy. At the end compare*/
-     /*  the number of chars moved with the size n. If they are equal       */
-     /*  return. Else continue to copy the remaining chars.                 */
-     /***********************************************************************/
-     for (rn = 0; rn < nn; rn++) *rto++ = *rfrom++;
-     if (nn == n) return (to);
-
-     /***********************************************************************/
-     /*  Write the memcpy of size >64K using nested for loops to make use   */
-     /*  of BANZ instrunction.                                              */
-     /***********************************************************************/
-     {
-        register unsigned int upper = (unsigned int)(n >> 16);
-        register unsigned int tmp;
-        for (tmp = 0; tmp < upper; tmp++)
-	{
-           for (rn = 0; rn < 65535; rn++)
-		*rto++ = *rfrom++;
-	   *rto++ = *rfrom++;
-	}
-     }
-
-     return (to);
-}
-#endif
-
-#if BUFFER_USE_RAM
-#pragma CODE_SECTION(HEXBUF_init, BUF_FUNCS_SECT)
-#endif
 HEXBUF_Handle HEXBUF_init()
 {
 	static struct _HEXBUF_Obj_ hexbuf;
@@ -61,9 +20,6 @@ HEXBUF_Handle HEXBUF_init()
     return (bufHandle);
 }
 
-#if BUFFER_USE_RAM
-#pragma CODE_SECTION(HEXBUF_writer, BUF_FUNCS_SECT)
-#endif
 int HEXBUF_writer(long data, int *buffer, int len)
 {
     //HEXBUF_Obj *bufobj = (HEXBUF_Obj *)data;
@@ -71,9 +27,50 @@ int HEXBUF_writer(long data, int *buffer, int len)
     return 0;
 }
 
-#if BUFFER_USE_RAM
-#pragma CODE_SECTION(HEXBUF_reader, BUF_FUNCS_SECT)
+#if HEXBUF_USE_FLASHAPI
+static int _flash_erase(HEXBUF_Obj *bufobj)
+{
+	Uint16 status = STATUS_SUCCESS;
+	FLASH_ST flash_status;
+
+	status = Flash_Erase(HEXBUF_SECTORS, &flash_status);
+	if (status == STATUS_SUCCESS)
+		bufobj->erased = 1;
+
+	return (status);
+}
+
+static int _flash_write(HEXBUF_Obj *bufobj)
+{
+	int len;
+	Uint16 status;
+	FLASH_ST flash_status;
+
+	len = bufobj->outidx;
+	bufobj->outidx = 0;
+
+	status = Flash_Program((Uint16 *)bufobj->outaddr,
+						   bufobj->output,
+						   len,
+						   &flash_status);
+
+	if (status != STATUS_SUCCESS)
+		return -status;
+
+	status = Flash_Verify((Uint16 *)bufobj->outaddr,
+						  bufobj->output,
+						  len,
+						  &flash_status);
+
+	if (status != STATUS_SUCCESS)
+		return -status;
+
+	bufobj->outaddr += len;
+
+	return (len);
+}
 #endif
+
 int HEXBUF_reader(long data, int *buffer, int len)
 {
     HEXBUF_Obj *bufobj = (HEXBUF_Obj *)data;
@@ -83,10 +80,16 @@ int HEXBUF_reader(long data, int *buffer, int len)
     int bufsize = len;
     long xdig;
     long addr = bufobj->addr;
+#ifdef HEXBUF_USE_FLASHAPI
+    int rc;
+
+    bufobj->outidx = 0;
+#endif
 
     /* Prepend last tailed buffer */
 	p = bufobj->buffer;
 	len += 5;
+	p[len] = '\0';
 
 	while (len--)
     {
@@ -132,16 +135,16 @@ int HEXBUF_reader(long data, int *buffer, int len)
 
 	    	case 'D':
     			if (len < 4)
-    				goto copybuf;
+    				goto copy_buf;
     		case 'A':
     		case 'E':
     			/* Not enough buffer input is available, request more */
     			if (len < 5)
 	    		{
-copybuf:
+copy_buf:
 					memset(bufobj->buffer, '\0', 5);
-    				memcpy(bufobj->buffer+(4-len), p, len+1);
-    				continue;
+    				xmemcpy(bufobj->buffer+(4-len), p, len+1);
+    				goto next_buf;
     			}
     			ep = NULL;
 	    		xdig = strtol(p, &ep, 16);
@@ -152,6 +155,25 @@ copybuf:
 	    			switch (tok) {
 	    			case 'A':
     					addr = xdig;
+#if HEXBUF_USE_FLASHAPI
+#if 1
+    					if (!bufobj->erased)
+    					{
+    						rc = _flash_erase(bufobj);
+    						if (rc < 0)
+    							return rc;
+    					}
+#endif
+
+    					/* Flush data to the Flash */
+    					if (bufobj->outidx != 0)
+    					{
+   							rc = _flash_write(bufobj);
+   							if (rc < 0)
+   								return rc;
+    					}
+   						bufobj->outaddr = addr;
+#endif
     					break;
 
     				case 'D':
@@ -173,7 +195,23 @@ copybuf:
     						addr++;
     						break;
     					}
-    					*((int *)addr++) = xdig & 0xffff;
+    					if (addr >= FLASH_START_ADDR && addr <= FLASH_END_ADDR)
+    					{
+#if HEXBUF_USE_FLASHAPI
+    						/* Flush data to the Flash */
+    						if (bufobj->outidx == sizeof(bufobj->output) || bufobj->outaddr+bufobj->outidx != addr)
+    						{
+    							rc = _flash_write(bufobj);
+    							if (rc < 0)
+    								return rc;
+    						}
+
+    						bufobj->output[bufobj->outidx++] = xdig & 0xffff;
+    						addr++;
+#endif
+    					}
+    					else
+    						*((int *)addr++) = xdig & 0xffff;
 
     					break;
 
@@ -197,12 +235,19 @@ next_buf:
     bufobj->addr  = addr;
     bufobj->token = tok;
 
+#if HEXBUF_USE_FLASHAPI
+	/* Flush data to the Flash */
+    if (bufobj->outidx != 0)
+    {
+    	rc = _flash_write(bufobj);
+		if (rc < 0)
+			return rc;
+    }
+#endif
+
     return bufsize;
 }
 
-#if BUFFER_USE_RAM
-#pragma CODE_SECTION(HEXBUF_setEntryPoint, BUF_FUNCS_SECT)
-#endif
 void HEXBUF_setEntryPoint(HEXBUF_Handle hexbufHandle, long entry)
 {
     HEXBUF_Obj *bufobj = (HEXBUF_Obj *)hexbufHandle;
@@ -210,9 +255,6 @@ void HEXBUF_setEntryPoint(HEXBUF_Handle hexbufHandle, long entry)
     bufobj->entry = entry;
 }
 
-#if BUFFER_USE_RAM
-#pragma CODE_SECTION(HEXBUF_getBuffer, BUF_FUNCS_SECT)
-#endif
 int *HEXBUF_getBuffer(HEXBUF_Handle hexbufHandle)
 {
     HEXBUF_Obj *bufobj = (HEXBUF_Obj *)hexbufHandle;
@@ -220,9 +262,6 @@ int *HEXBUF_getBuffer(HEXBUF_Handle hexbufHandle)
     return (int *)(bufobj->buffer+5);
 }
 
-#if BUFFER_USE_RAM
-#pragma CODE_SECTION(HEXBUF_start, BUF_FUNCS_SECT)
-#endif
 void HEXBUF_start(HEXBUF_Handle hexbufHandle)
 {
     HEXBUF_Obj *bufobj = (HEXBUF_Obj *)hexbufHandle;

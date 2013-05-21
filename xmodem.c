@@ -18,12 +18,14 @@
  */
 #include "DSP28x_Project.h"
 
-#if XMODEM_USE_RAM
-#define _INLINE 1
-#endif
 #include <string.h>
 
 #include "f280x_bufops/xmodem.h"
+
+#if BUFFER_USE_RAM
+#define _INLINE 1
+#endif
+#include <string.h>
 
 #define SOH	0x01
 #define STX	0x02
@@ -41,7 +43,7 @@
 #define BUFLEN_DIV	1
 #endif
 
-#if XMODEM_USE_RAM || XMODEM_USE_OLD_API
+#if BUFFER_USE_RAM || XMODEM_USE_OLD_API
 #define SCI_PUT_DATA(sci, data, action)							\
 		struct SCI_REGS *regs = (struct SCI_REGS *)sci; 		\
 		if (regs->SCICTL2.bit.TXRDY) {							\
@@ -72,10 +74,7 @@
 
 /* crctab calculated by Mark G. Mendel, Network Systems Corporation */
 #if XMODEM_WITH_CRC
-#if XMODEM_USE_RAM
-#pragma DATA_SECTION(crctable, XMODEM_DATA_SECT)
-#endif
-uint16_t crctable[] = {
+const uint16_t crctable[] = {
         0x0000, 0x1021, 0x2042, 0x3063, 0x4084, 0x50a5, 0x60c6, 0x70e7,
         0x8108, 0x9129, 0xa14a, 0xb16b, 0xc18c, 0xd1ad, 0xe1ce, 0xf1ef,
         0x1231, 0x0210, 0x3273, 0x2252, 0x52b5, 0x4294, 0x72f7, 0x62d6,
@@ -112,31 +111,27 @@ uint16_t crctable[] = {
 #endif
 
 #if XMODEM_WITH_BUFFER
-#if XMODEM_USE_RAM
-#pragma DATA_SECTION(_xmodem_buffer, XMODEM_DATA_SECT)
-#endif
 static int _xmodem_buffer[128];
 #endif
 
-#if XMODEM_USE_RAM
-#pragma CODE_SECTION(_xmodem_putc, XMODEM_FUNCS_SECT)
-#endif
 static int _xmodem_putc(XMODEM_Obj *x, char c)
 {
 	int i = XMODEM_TIMEOUT*1000L;
 
 	while (i--)
 	{
-		SCI_PUT_DATA(x->sci, c, return 1);
+		struct SCI_REGS *regs = (struct SCI_REGS *)x->sci;
+		if (regs->SCICTL2.bit.TXRDY) {
+			regs->SCITXBUF = c;
+			return 1;
+		}
+//		SCI_PUT_DATA(x->sci, c, return 1);
 
 		DELAY_US(10L);
 	}
 	return 0;
 }
 
-#if XMODEM_USE_RAM
-#pragma CODE_SECTION(_xmodem_putm, XMODEM_FUNCS_SECT)
-#endif
 static void _xmodem_putm(XMODEM_Obj *x, int *buffer, int len)
 {
 	int i;
@@ -149,9 +144,6 @@ static void _xmodem_putm(XMODEM_Obj *x, int *buffer, int len)
 	}
 }
 
-#if XMODEM_USE_RAM
-#pragma CODE_SECTION(_xmodem_getc, XMODEM_FUNCS_SECT)
-#endif
 static inline int _xmodem_getc(XMODEM_Obj *x, uint16_t *success)
 {
 	int16_t c;
@@ -172,9 +164,6 @@ static inline int _xmodem_getc(XMODEM_Obj *x, uint16_t *success)
 //	return SCI_getDataBlocking(x->sci);
 }
 
-#if XMODEM_USE_RAM
-#pragma CODE_SECTION(_xmodem_getc_t, XMODEM_FUNCS_SECT)
-#endif
 static int _xmodem_getc_t(XMODEM_Obj *x, uint16_t *success)
 {
 	int c;
@@ -195,9 +184,6 @@ static int _xmodem_getc_t(XMODEM_Obj *x, uint16_t *success)
 	return 0;
 }
 
-#if XMODEM_USE_RAM
-#pragma CODE_SECTION(_xmodem_getm, XMODEM_FUNCS_SECT)
-#endif
 static int _xmodem_getm(XMODEM_Obj *x, int *buffer, int len)
 {
 	int i;
@@ -229,9 +215,6 @@ static int _xmodem_getm(XMODEM_Obj *x, int *buffer, int len)
 	return i;
 }
 
-#if XMODEM_USE_RAM
-#pragma CODE_SECTION(_xmodem_calc_checksum, XMODEM_FUNCS_SECT)
-#endif
 static uint16_t _xmodem_calc_checksum(int *buffer, int len)
 {
 	int i;
@@ -253,9 +236,6 @@ static uint16_t _xmodem_calc_checksum(int *buffer, int len)
 }
 
 #if XMODEM_WITH_CRC
-#if XMODEM_USE_RAM
-#pragma CODE_SECTION(_xmodem_calc_crc, XMODEM_FUNCS_SECT)
-#endif
 static uint16_t _xmodem_calc_crc(int *buffer, int len)
 {
 	int i;
@@ -279,9 +259,6 @@ static uint16_t _xmodem_calc_crc(int *buffer, int len)
 #endif
 
 
-#if XMODEM_USE_RAM
-#pragma CODE_SECTION(XMODEM_init, XMODEM_FUNCS_SECT)
-#endif
 #if XMODEM_USE_OLD_API
 XMODEM_Handle XMODEM_init(struct SCI_REGS *sciHandle);
 #else
@@ -298,9 +275,6 @@ XMODEM_Handle XMODEM_init(SCI_Handle sciHandle)
     return (xmodemHandle);
 }
 
-#if XMODEM_USE_RAM
-#pragma CODE_SECTION(XMODEM_setWriter, XMODEM_FUNCS_SECT)
-#endif
 void XMODEM_setWriter(XMODEM_Handle xmodemHandle, BUF_Op_cb writerCallback, long cbData)
 {
     XMODEM_Obj *x = (XMODEM_Obj *)xmodemHandle;
@@ -309,9 +283,6 @@ void XMODEM_setWriter(XMODEM_Handle xmodemHandle, BUF_Op_cb writerCallback, long
     x->writer_data = cbData;
 }
 
-#if XMODEM_USE_RAM
-#pragma CODE_SECTION(XMODEM_setReader, XMODEM_FUNCS_SECT)
-#endif
 void XMODEM_setReader(XMODEM_Handle xmodemHandle, BUF_Op_cb readerCallback, long cbData)
 {
     XMODEM_Obj *x = (XMODEM_Obj *)xmodemHandle;
@@ -320,10 +291,6 @@ void XMODEM_setReader(XMODEM_Handle xmodemHandle, BUF_Op_cb readerCallback, long
     x->reader_data = cbData;
 }
 
-
-#if XMODEM_USE_RAM
-#pragma CODE_SECTION(XMODEM_abort, XMODEM_FUNCS_SECT)
-#endif
 void XMODEM_setRetry(XMODEM_Handle xmodemHandle, int retry)
 {
     XMODEM_Obj *x = (XMODEM_Obj *)xmodemHandle;
@@ -331,10 +298,6 @@ void XMODEM_setRetry(XMODEM_Handle xmodemHandle, int retry)
     x->retry = retry;
 }
 
-
-#if XMODEM_USE_RAM
-#pragma CODE_SECTION(XMODEM_abort, XMODEM_FUNCS_SECT)
-#endif
 void XMODEM_abort(XMODEM_Handle xmodemHandle, int count)
 {
     int i;
@@ -346,9 +309,6 @@ void XMODEM_abort(XMODEM_Handle xmodemHandle, int count)
     }
 }
 
-#if XMODEM_USE_RAM
-#pragma CODE_SECTION(XMODEM_send, XMODEM_FUNCS_SECT)
-#endif
 int XMODEM_send(XMODEM_Handle xmodemHandle, int *buffer, int bufsize)
 {
     XMODEM_Obj *x = (XMODEM_Obj *)xmodemHandle;
@@ -489,10 +449,6 @@ abort:
     return 0;
 }
 
-
-#if XMODEM_USE_RAM
-#pragma CODE_SECTION(XMODEM_recv, XMODEM_FUNCS_SECT)
-#endif
 int XMODEM_recv(XMODEM_Handle xmodemHandle, int *buffer, int bufsize)
 {
     XMODEM_Obj *x = (XMODEM_Obj *)xmodemHandle;
@@ -674,7 +630,7 @@ init_done:
 					buffer += PACKET_SIZE;
    				}
    				_xmodem_putc(x, ACK);
-   				sequence = (sequence + 1) % 0x100;
+   				sequence = (sequence + 1) & 0xff;
 
    				c = _xmodem_getc_t(x, &success);
    				continue;
@@ -703,9 +659,6 @@ abort:
 
 #if XMODEM_WITH_PACKEDBUF
 // TODO: …to be completed
-#if XMODEM_USE_RAM
-#pragma CODE_SECTION(XMODEM_unpack, XMODEM_FUNCS_SECT)
-#endif
 void XMODEM_unpack(int16_t *buffer, int bufsize)
 {
 	while (bufsize-- > 1)
