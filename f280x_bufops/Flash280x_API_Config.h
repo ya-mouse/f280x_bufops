@@ -73,6 +73,29 @@ extern "C" {
 #define SCALE_FACTOR  1048576.0L*( (200L/CPU_RATE) )  // IQ20
 
 
+#define OTP_START_ADDR  0x3D7800L
+#define OTP_END_ADDR    0x3D7BFFL
+
+#if FLASH_F2808
+#define FLASH_START_ADDR  0x3E8000L
+#define FLASH_END_ADDR    0x3F7FFFL
+#endif
+
+#if FLASH_F2806
+#define FLASH_START_ADDR  0x3F0000L
+#define FLASH_END_ADDR    0x3F7FFFL
+#endif
+
+#if FLASH_F2802
+#define FLASH_START_ADDR  0x3F0000L
+#define FLASH_END_ADDR    0x3F7FFFL
+#endif
+
+#if FLASH_F2801
+#define FLASH_START_ADDR  0x3F4000L
+#define FLASH_END_ADDR    0x3F7FFFL
+#endif
+
 #ifdef __cplusplus
 }
 #endif /* extern "C" */
