@@ -1,4 +1,42 @@
-// #define _FLASH
+/*
+ *  Sample part of a linker script
+ *
+
+MEMORY
+{
+// ...
+
+   RAML0   : origin = 0x008000, length = 0x000E00
+   FLASHD  : origin = 0x3E8000, length = 0x003000
+
+// ...
+}
+
+SECTIONS
+{
+   Flash28_API:
+   {
+        -lFlash280*_API_V30*.lib(.econst) 
+        -lFlash280*_API_V30*.lib(.text)
+        -lrts*.lib<memset.obj>(.text)
+        -lrts*.lib<memcpy_ff.obj>(.text)
+        -lrts*.lib<strtol.obj>(.text)
+        -lrts*.lib<ctype.obj>(.econst)
+        -lbufops.lib(.econst) 
+        -lbufops.lib(.text)
+   }                   LOAD = FLASHD, 
+                       RUN = RAML0, 
+                       LOAD_START(_Flash28_API_LoadStart),
+                       LOAD_END(_Flash28_API_LoadEnd),
+                       RUN_START(_Flash28_API_RunStart),
+                       PAGE = 0
+    // ...
+}
+
+*/
+
+
+#define _FLASH
 
 #define XMODEM_USE_OLD_API 1
 
@@ -13,6 +51,9 @@ void MY_local_fwup(int flg)
 	HEXBUF_Handle myHexbuf;
 	XMODEM_Handle myXmodem;
 
+	__disable_interrupts();
+
+	// Make sure, that SciaRegs is configured to work in polling mode
 	myXmodem = XMODEM_init(SciaRegs);
 
 	Flash_CPUScaleFactor = SCALE_FACTOR;
