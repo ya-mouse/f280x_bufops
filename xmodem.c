@@ -36,11 +36,11 @@
 #define CRC	0x43
 
 #if XMODEM_WITH_PACKEDBUF
-#define PACKET_SIZE packet_size/2
-#define BUFLEN_DIV	2
+#define PACKET_SIZE (packet_size >> 1)
+#define BUFLEN_DIV	1
 #else
 #define PACKET_SIZE packet_size
-#define BUFLEN_DIV	1
+#define BUFLEN_DIV	0
 #endif
 
 #if BUFFER_USE_RAM || XMODEM_USE_OLD_API
@@ -130,7 +130,7 @@ static int _xmodem_putc(XMODEM_Obj *x, char c)
 static void _xmodem_putm(XMODEM_Obj *x, int *buffer, int len)
 {
 	int i;
-	for (i = 0; i < len/BUFLEN_DIV; i++)
+	for (i = 0; i < (len >> BUFLEN_DIV); i++)
 	{
 		_xmodem_putc(x, buffer[i] & 0xff);
 #if XMODEM_WITH_PACKEDBUF
@@ -192,14 +192,14 @@ static int _xmodem_getm(XMODEM_Obj *x, int *buffer, int len)
 			return i;
 #if XMODEM_WITH_PACKEDBUF
 		if (buffer)
-			buffer[i/2] = c;
+			buffer[i >> 1] = c;
 		if (i == len-1)
 			return i+1;
 		c = _xmodem_getc_t(x, &success);
 		if (!success)
 			return i+1;
 		if (buffer)
-			buffer[i/2] |= c << 8;
+			buffer[i >> 1] |= c << 8;
 		i++;
 #else
 		if (buffer)
@@ -216,7 +216,7 @@ static uint16_t _xmodem_calc_checksum(int *buffer, int len)
 	uint16_t sum = 0;
 
 #if XMODEM_WITH_PACKEDBUF
-	for (i = 0; i < len/2; i++)
+	for (i = 0; i < (len >> 1); i++)
 	{
 		sum += (buffer[i] & 0xff) + (buffer[i] >> 8);
 	}
@@ -237,7 +237,7 @@ static uint16_t _xmodem_calc_crc(int *buffer, int len)
 	uint16_t crc = 0;
 
 #if XMODEM_WITH_PACKEDBUF
-	for (i = 0; i < len/2; i++)
+	for (i = 0; i < (len >> 1); i++)
 	{
 		crc = (crc << 8) ^ crctable[((crc >> 8) ^ (buffer[i] & 0xff)) & 0xff];
 		crc = (crc << 8) ^ crctable[((crc >> 8) ^ (buffer[i] >> 8)) & 0xff];
@@ -411,7 +411,7 @@ init_done:
     	}
 
     	/* Keep track of sequence */
-    	sequence = (sequence +1 ) % 0x100;
+    	sequence = (sequence +1 ) & 0xff;
 
     	/* Call callback to get more data */
     	if (x->writer)
@@ -469,7 +469,7 @@ int XMODEM_recv(XMODEM_Handle xmodemHandle, int *buffer, int bufsize)
     	if (error_count >= x->retry)
     		goto abort;
 #if XMODEM_WITH_CRC
-    	if (crc_mode && (error_count < (x->retry / 2)))
+    	if (crc_mode && (error_count < (x->retry >> 1)))
     	{
     		if (!_xmodem_putc(x, CRC))
     		{
@@ -595,8 +595,8 @@ init_done:
    			if (crc_mode)
    			{
 #if XMODEM_WITH_PACKEDBUF
-   				csum  = (uint16_t)buffer[packet_size/2] >> 8;
-   				csum |= (buffer[packet_size/2] & 0xff) << 8;
+   				csum  = (uint16_t)buffer[packet_size >> 1] >> 8;
+   				csum |= (buffer[packet_size >> 1] & 0xff) << 8;
 #else
    				csum = buffer[packet_size] << 8 | buffer[packet_size+1];
 #endif
@@ -658,7 +658,7 @@ void XMODEM_unpack(int16_t *buffer, int bufsize)
 {
 	while (bufsize-- > 1)
 	{
-		buffer[bufsize] = buffer[bufsize/2];
+		buffer[bufsize] = buffer[bufsize >> 1];
 	}
 }
 #endif

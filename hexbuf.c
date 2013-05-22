@@ -1,12 +1,12 @@
 #include "DSP28x_Project.h"
 
+#include "f280x_bufops/hexbuf.h"
+
 #if BUFFER_USE_RAM
 #define _INLINE 1
 #endif
 #include <stdlib.h>
 #include <string.h>
-
-#include "f280x_bufops/hexbuf.h"
 
 HEXBUF_Handle HEXBUF_init()
 {
@@ -53,7 +53,7 @@ static int _flash_write(HEXBUF_Obj *bufobj)
 	bufobj->outidx = 0;
 
 	if (bufobj->flashing_disabled)
-		return (len);
+		goto increment_outaddr;
 
 	status = Flash_Program((Uint16 *)bufobj->outaddr,
 						   bufobj->output,
@@ -71,6 +71,7 @@ static int _flash_write(HEXBUF_Obj *bufobj)
 	if (status != STATUS_SUCCESS)
 		return -status;
 
+increment_outaddr:
 	bufobj->outaddr += len;
 
 	return (len);
@@ -182,9 +183,9 @@ copy_buf:
 
     				case 'D':
     					/* Protect stack */
-#ifdef _FLASH
+#if 1
     					/* RAMM0 */
-    					if ((addr >= 0x000 && addr < 0x400)
+    					if ((addr >= 0x3B0 && addr < 0x400)
 #else
     					/* RAMM1 */
     					if ((addr >= 0x400 && addr < 0x800)
