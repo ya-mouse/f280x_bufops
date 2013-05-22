@@ -26,6 +26,7 @@ typedef struct _HEXBUF_Obj_
 	int outidx;
 	long outaddr;
 	int erased;
+	int flashing_disabled;
 #endif
 } HEXBUF_Obj;
 
@@ -46,6 +47,9 @@ int HEXBUF_reader(long data, int *buffer, int len);
 
 /* Set EntryPoint address */
 void HEXBUF_setEntryPoint(HEXBUF_Handle hexbufHandle, long entry);
+
+/* Disable flashing */
+void HEXBUF_disableFlashing(HEXBUF_Handle hexbufHandle);
 
 /* Return pointer to the internal buffer with 4-char offset for the previous tail */
 int *HEXBUF_getBuffer(HEXBUF_Handle hexbufHandle);

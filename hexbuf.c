@@ -33,6 +33,9 @@ static int _flash_erase(HEXBUF_Obj *bufobj)
 	Uint16 status = STATUS_SUCCESS;
 	FLASH_ST flash_status;
 
+	if (bufobj->flashing_disabled)
+		return STATUS_SUCCESS;
+
 	status = Flash_Erase(HEXBUF_SECTORS, &flash_status);
 	if (status == STATUS_SUCCESS)
 		bufobj->erased = 1;
@@ -48,6 +51,9 @@ static int _flash_write(HEXBUF_Obj *bufobj)
 
 	len = bufobj->outidx;
 	bufobj->outidx = 0;
+
+	if (bufobj->flashing_disabled)
+		return (len);
 
 	status = Flash_Program((Uint16 *)bufobj->outaddr,
 						   bufobj->output,
@@ -156,14 +162,12 @@ copy_buf:
 	    			case 'A':
     					addr = xdig;
 #if HEXBUF_USE_FLASHAPI
-#if 1
     					if (!bufobj->erased)
     					{
     						rc = _flash_erase(bufobj);
     						if (rc < 0)
     							return rc;
     					}
-#endif
 
     					/* Flush data to the Flash */
     					if (bufobj->outidx != 0)
@@ -207,8 +211,8 @@ copy_buf:
     						}
 
     						bufobj->output[bufobj->outidx++] = xdig & 0xffff;
-    						addr++;
 #endif
+    						addr++;
     					}
     					else
     						*((int *)addr++) = xdig & 0xffff;
@@ -253,6 +257,15 @@ void HEXBUF_setEntryPoint(HEXBUF_Handle hexbufHandle, long entry)
     HEXBUF_Obj *bufobj = (HEXBUF_Obj *)hexbufHandle;
 
     bufobj->entry = entry;
+}
+
+void HEXBUF_disableFlashing(HEXBUF_Handle hexbufHandle)
+{
+#if HEXBUF_USE_FLASHAPI
+    HEXBUF_Obj *bufobj = (HEXBUF_Obj *)hexbufHandle;
+
+    bufobj->flashing_disabled = 1;
+#endif
 }
 
 int *HEXBUF_getBuffer(HEXBUF_Handle hexbufHandle)
