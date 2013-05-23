@@ -16,6 +16,7 @@ HEXBUF_Handle HEXBUF_init()
 	memset(bufHandle, 0, sizeof(HEXBUF_Obj));
 
 	hexbuf.addr = -1;
+	hexbuf.flashing_disabled = 0xAA;
 
     return (bufHandle);
 }
@@ -33,7 +34,7 @@ static int _flash_erase(HEXBUF_Obj *bufobj)
 	Uint16 status = STATUS_SUCCESS;
 	FLASH_ST flash_status;
 
-	if (bufobj->flashing_disabled)
+	if (bufobj->flashing_disabled != 0x55)
 		return STATUS_SUCCESS;
 
 	status = Flash_Erase(HEXBUF_SECTORS, &flash_status);
@@ -52,7 +53,7 @@ static int _flash_write(HEXBUF_Obj *bufobj)
 	len = bufobj->outidx;
 	bufobj->outidx = 0;
 
-	if (bufobj->flashing_disabled)
+	if (bufobj->flashing_disabled != 0x55)
 		goto increment_outaddr;
 
 	status = Flash_Program((Uint16 *)bufobj->outaddr,
@@ -150,7 +151,7 @@ int HEXBUF_reader(long data, int *buffer, int len)
 	    		{
 copy_buf:
 					memset(bufobj->buffer, '\0', 5);
-    				xmemcpy(bufobj->buffer+(4-len), p, len+1);
+    				memcpy(bufobj->buffer+(4-len), p, len+1);
     				goto next_buf;
     			}
     			ep = NULL;
@@ -265,7 +266,16 @@ void HEXBUF_disableFlashing(HEXBUF_Handle hexbufHandle)
 #if HEXBUF_USE_FLASHAPI
     HEXBUF_Obj *bufobj = (HEXBUF_Obj *)hexbufHandle;
 
-    bufobj->flashing_disabled = 1;
+    bufobj->flashing_disabled = 0xAA;
+#endif
+}
+
+void HEXBUF_enableFlashing(HEXBUF_Handle hexbufHandle)
+{
+#if HEXBUF_USE_FLASHAPI
+    HEXBUF_Obj *bufobj = (HEXBUF_Obj *)hexbufHandle;
+
+    bufobj->flashing_disabled = 0x55;
 #endif
 }
 
@@ -284,6 +294,6 @@ void HEXBUF_start(HEXBUF_Handle hexbufHandle)
     // TODO: enable WDog
 
     /* Branch to entry point */
-    if (start != NULL)
+    if (start != (void *)0xFFFFFFFF)
     	start();
 }

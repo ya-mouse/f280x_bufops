@@ -51,6 +51,9 @@ void HEXBUF_setEntryPoint(HEXBUF_Handle hexbufHandle, long entry);
 /* Disable flashing */
 void HEXBUF_disableFlashing(HEXBUF_Handle hexbufHandle);
 
+/* Enable flashing */
+void HEXBUF_enableFlashing(HEXBUF_Handle hexbufHandle);
+
 /* Return pointer to the internal buffer with 4-char offset for the previous tail */
 int *HEXBUF_getBuffer(HEXBUF_Handle hexbufHandle);
 
