@@ -73,6 +73,29 @@ typedef struct
 	} u;
 } canbuf_cmd;
 
+// #define DEB 1
+extern int scia_printf(const char *_format, ...);
+
+#if CANBUF_SCIA_PROGRESS
+static int _cscia_putc(char c)
+{
+	int i = 15*1000L;
+
+	while (i--)
+	{
+		if (SciaRegs.SCICTL2.bit.TXRDY) {
+			SciaRegs.SCITXBUF = c;
+			return 1;
+		}
+
+		DELAY_US(10L);
+	}
+	return 0;
+}
+#else
+#define _cscia_putc(c) while (0) { }
+#endif
+
 static int _canbuf_recv(CANBUF_Obj *canbuf, int mbx, uint32_t *mdl, uint32_t *mdh)
 {
 	volatile struct MBOX *mbox;
@@ -98,10 +121,6 @@ static int _canbuf_recv(CANBUF_Obj *canbuf, int mbx, uint32_t *mdl, uint32_t *md
 
 	return 0;
 }
-
-
-// #define DEB 1
-extern int scia_printf(const char *_format, ...);
 
 
 static uint32_t _canbuf_get_cmd(CANBUF_Obj *canbuf, CANBUF_Command_e *cmd)
@@ -474,22 +493,6 @@ abort:
 
 	_canbuf_send_cmd(ecan, CANBUF_Command_CAN, 0);
 	return -1;
-}
-
-static int _cscia_putc(char c)
-{
-	int i = 15*1000L;
-
-	while (i--)
-	{
-		if (SciaRegs.SCICTL2.bit.TXRDY) {
-			SciaRegs.SCITXBUF = c;
-			return 1;
-		}
-
-		DELAY_US(10L);
-	}
-	return 0;
 }
 
 int CANBUF_recv(CANBUF_Handle canbufHandle, int *buffer, int bufsize)

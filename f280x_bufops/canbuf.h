@@ -17,6 +17,10 @@ extern "C" {
 #define CANBUF_WITH_ASCIIBUF 1
 #endif
 
+#ifndef CANBUF_SCIA_PROGRESS
+#define CANBUF_SCIA_PROGRESS 1
+#endif
+
 //! \brief Defines the CANBUF object
 //!
 typedef struct _CANBUF_Obj_
