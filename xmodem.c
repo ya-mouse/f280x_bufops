@@ -286,6 +286,14 @@ void XMODEM_setReader(XMODEM_Handle xmodemHandle, BUF_Op_cb readerCallback, long
     x->reader_data = cbData;
 }
 
+void XMODEM_setEnd(XMODEM_Handle xmodemHandle, BUF_Op_cb endCallback, long cbData)
+{
+    XMODEM_Obj *x = (XMODEM_Obj *)xmodemHandle;
+
+    x->end = endCallback;
+    x->end_data = cbData;
+}
+
 void XMODEM_setRetry(XMODEM_Handle xmodemHandle, int retry)
 {
     XMODEM_Obj *x = (XMODEM_Obj *)xmodemHandle;
@@ -302,6 +310,17 @@ void XMODEM_abort(XMODEM_Handle xmodemHandle, int count)
     {
         _xmodem_putc(x, CAN);
     }
+}
+
+int XMODEM_end(long data, int *buffer, int bufsize)
+{
+    /* End of transmission */
+    _xmodem_putc((XMODEM_Obj *)data, EOT);
+
+    /* Wait a bit */
+	DELAY_US(2000000L);
+
+	return 1;
 }
 
 int XMODEM_send(XMODEM_Handle xmodemHandle, int *buffer, int bufsize)
@@ -430,13 +449,12 @@ init_done:
     		break;
     }
 
-    /* End of transmission */
-    _xmodem_putc(x, EOT);
+    if (x->end)
+    {
+    	x->end(x->end_data, buffer, bufsize);
+    }
 
-    /* Wait a bit */
-	DELAY_US(2000000L);
-
-    return 1;
+    return XMODEM_end((long)xmodemHandle, NULL, 0);
 
 abort:
 	XMODEM_abort(xmodemHandle, XMODEM_ABORT_COUNT);
@@ -526,7 +544,18 @@ init_done:
     sequence = 1;
     cancel = 0;
 
-    for (;;)
+#if XMODEM_WITH_BUFFER
+	if (buffer == NULL)
+	{
+		buffer = _xmodem_buffer;
+		bufsize = PACKET_SIZE;
+	}
+#else
+	if (!len || buffer == NULL)
+		return 0;
+#endif
+
+	for (;;)
     {
     	for (;;)
     	{
@@ -546,6 +575,10 @@ init_done:
     		else if (c == EOT)
     		{
 				_xmodem_putc(x, ACK);
+			    if (x->end)
+			    {
+			    	x->end(x->end_data, buffer, bufsize);
+			    }
     			DELAY_US(2000000L);
     			return income_size;
     		}
@@ -611,7 +644,8 @@ init_done:
 
    			if (valid)
    			{
-   				income_size += packet_size;
+//   				income_size += packet_size;
+   				income_size++;
    				if (x->reader)
    				{
    					bufsize = x->reader(x->reader_data, buffer, packet_size);

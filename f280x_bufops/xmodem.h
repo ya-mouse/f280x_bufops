@@ -38,7 +38,7 @@ extern "C" {
 /* Use internal XMODEM library buffer to store intermediate data.
  * Usefull with update/process callbacks */
 #ifndef XMODEM_WITH_BUFFER
-#define XMODEM_WITH_BUFFER 0
+#define XMODEM_WITH_BUFFER 1
 #endif
 
 /* Use CRC-16 checksums */
@@ -63,15 +63,17 @@ extern "C" {
 typedef struct _XMODEM_Obj_
 {
 #if XMODEM_USE_OLD_API
-	struct SCI_REGS *sci;
+	volatile struct SCI_REGS *sci;
 #else
-	SCI_Handle sci;
+	volatile SCI_Handle sci;
 #endif
 	int retry;
 	BUF_Op_cb writer;
 	BUF_Op_cb reader;
+	BUF_Op_cb end;
 	long writer_data;
 	long reader_data;
+	long end_data;
 } XMODEM_Obj;
 
 
@@ -88,6 +90,10 @@ XMODEM_Handle XMODEM_init(SCI_Handle sciHandle);
 void XMODEM_setWriter(XMODEM_Handle xmodemHandle, BUF_Op_cb writerCallback, long cbData);
 
 void XMODEM_setReader(XMODEM_Handle xmodemHandle, BUF_Op_cb readerCallback, long cbData);
+
+void XMODEM_setEnd(XMODEM_Handle xmodemHandle, BUF_Op_cb endCallback, long cbData);
+
+int XMODEM_end(long data, int *buffer, int len);
 
 void XMODEM_setRetry(XMODEM_Handle xmodemHandle, int retry);
 
