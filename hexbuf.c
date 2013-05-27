@@ -16,6 +16,7 @@ HEXBUF_Handle HEXBUF_init()
 	memset(bufHandle, 0, sizeof(HEXBUF_Obj));
 
 	hexbuf.addr = -1;
+	hexbuf.entry = -1;
 	hexbuf.flashing_disabled = 0xAA;
 
     return (bufHandle);
@@ -29,6 +30,7 @@ int HEXBUF_writer(long data, int *buffer, int len)
 }
 
 #if HEXBUF_USE_FLASHAPI
+#if HEXBUF_ENABLE_ERASE
 static int _flash_erase(HEXBUF_Obj *bufobj)
 {
 	Uint16 status = STATUS_SUCCESS;
@@ -43,6 +45,7 @@ static int _flash_erase(HEXBUF_Obj *bufobj)
 
 	return (status);
 }
+#endif
 
 static int _flash_write(HEXBUF_Obj *bufobj)
 {
@@ -78,6 +81,13 @@ increment_outaddr:
 	return (len);
 }
 #endif
+
+int HEXBUF_end(long data, int *buffer, int len)
+{
+	HEXBUF_start((HEXBUF_Handle)data);
+
+	return 1;
+}
 
 int HEXBUF_reader(long data, int *buffer, int len)
 {
@@ -151,7 +161,7 @@ int HEXBUF_reader(long data, int *buffer, int len)
 	    		{
 copy_buf:
 					memset(bufobj->buffer, '\0', 5);
-    				memcpy(bufobj->buffer+(4-len), p, len+1);
+    				xmemcpy(bufobj->buffer+(4-len), p, len+1);
     				goto next_buf;
     			}
     			ep = NULL;
@@ -164,12 +174,14 @@ copy_buf:
 	    			case 'A':
     					addr = xdig;
 #if HEXBUF_USE_FLASHAPI
+#if HEXBUF_ENABLE_ERASE
     					if (!bufobj->erased)
     					{
     						rc = _flash_erase(bufobj);
     						if (rc < 0)
     							return rc;
     					}
+#endif
 
     					/* Flush data to the Flash */
     					if (bufobj->outidx != 0)

@@ -7,7 +7,13 @@ extern "C" {
 
 #include "f280x_bufops/bufops.h"
 
+#ifndef HEXBUF_USE_FLASHAPI
 #define HEXBUF_USE_FLASHAPI 1
+#endif
+
+#ifndef HEXBUF_ENABLE_ERASE
+#define HEXBUF_ENABLE_ERASE 0
+#endif
 
 #if HEXBUF_USE_FLASHAPI
 #define HEXBUF_SECTORS	(SECTORC|SECTORD)
@@ -25,7 +31,9 @@ typedef struct _HEXBUF_Obj_
 	Uint16 output[16];
 	int outidx;
 	long outaddr;
+#if HEXBUF_ENABLE_ERASE
 	int erased;
+#endif
 	int flashing_disabled;
 #endif
 } HEXBUF_Obj;
@@ -44,6 +52,9 @@ int HEXBUF_writer(long data, int *buffer, int len);
 
 /* Write HEX-formatted data to the memory / flash */
 int HEXBUF_reader(long data, int *buffer, int len);
+
+/* To be called at the end of transmission */
+int HEXBUF_end(long data, int *buffer, int len);
 
 /* Set EntryPoint address */
 void HEXBUF_setEntryPoint(HEXBUF_Handle hexbufHandle, long entry);
