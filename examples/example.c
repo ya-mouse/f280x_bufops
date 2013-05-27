@@ -2,6 +2,9 @@
  *  Sample part of a linker script
  *
 
+-u _memset
+-u _strtol
+
 MEMORY
 {
 // ...
@@ -18,12 +21,10 @@ SECTIONS
    {
         -lFlash280*_API_V30*.lib(.econst) 
         -lFlash280*_API_V30*.lib(.text)
-        -lrts*.lib<memset.obj>(.text)
-        -lrts*.lib<memcpy_ff.obj>(.text)
-        -lrts*.lib<strtol.obj>(.text)
-        -lrts*.lib<ctype.obj>(.econst)
         -lbufops.lib(.econst) 
         -lbufops.lib(.text)
+        -lrts*.lib<ctype.obj>(.econst)
+        -lrts*.lib<strtol.obj,memset.obj>(.text)
    }                   LOAD = FLASHD, 
                        RUN = RAML0, 
                        LOAD_START(_Flash28_API_LoadStart),
@@ -46,35 +47,87 @@ SECTIONS
 #ifdef _FLASH
 #pragma CODE_SECTION(LEVELER_local_fwup, "Flash28_API")
 #endif
+/*
+ * Example routine to flash ourselves with Xmodem or eCAN source
+ * using HEXBUF format produced from `out' file by out2hex.pl tool
+ */
 void MY_local_fwup(int flg)
 {
 	HEXBUF_Handle myHexbuf;
 	XMODEM_Handle myXmodem;
+	CANBUF_Handle myCanbuf;
+	Uint16 status;
+	FLASH_ST flash_status;
 
-	__disable_interrupts();
-
-	// Make sure, that SciaRegs is configured to work in polling mode
-	myXmodem = XMODEM_init(SciaRegs);
-
-	Flash_CPUScaleFactor = SCALE_FACTOR;
-	Flash_CallbackPtr = NULL;
-
-	myHexbuf = HEXBUF_init();
-	if (!flg)
+	do
 	{
-		scia_msg("\r\nDisable flashing\r\n");
-		HEXBUF_disableFlashing(myHexbuf);
+		__disable_interrupts();
+
+		if (!(flg & 0x10))
+		{
+			// Make sure, that SciaRegs is configured to work in polling mode
+			scia_msg("\r\nUsing XMODEM. ");
+			myXmodem = XMODEM_init(mySci);
+		}
+		else
+		{
+			scia_msg("\r\nUsing CANBUF. ");
+			myCanbuf = CANBUF_init(&ECanaRegs, CANBUF_Mode_Receive, 0x400);
+		}
+
+		Flash_CPUScaleFactor = SCALE_FACTOR;
+		Flash_CallbackPtr = NULL;
+
+		myHexbuf = HEXBUF_init();
+		if (!(flg & 0xf))
+		{
+			scia_msg("Disable flashing\r\n");
+			HEXBUF_disableFlashing(myHexbuf);
+		}
+		else
+		{
+			scia_msg("Erasing, please wait...\r\n");
+			HEXBUF_enableFlashing(myHexbuf);
+
+			status = Flash_Erase(HEXBUF_SECTORS, &flash_status);
+			if (status != STATUS_SUCCESS)
+			{
+				scia_printf("failed: %d\r\n", status);
+				break;
+			}
+		}
+		if (!(flg & 0x10))
+		{
+			XMODEM_setReader(myXmodem, HEXBUF_reader, (long)myHexbuf);
+			XMODEM_setEnd(myXmodem, HEXBUF_end, (long)myHexbuf);
+			XMODEM_recv(myXmodem, HEXBUF_getBuffer(myHexbuf), 128);
+		}
+		else
+		{
+			CANBUF_setReader(myCanbuf, HEXBUF_reader, (long)myHexbuf);
+			CANBUF_setEnd(myCanbuf, HEXBUF_end, (long)myHexbuf);
+			CANBUF_recv(myCanbuf, HEXBUF_getBuffer(myHexbuf), 128);
+		}
 	}
-	else
-	{
-		scia_msg("\r\nEnable flashing\r\n");
-		HEXBUF_enableFlashing(myHexbuf);
-	}
-	XMODEM_setReader(myXmodem, HEXBUF_reader, (long)myHexbuf);
-	if (XMODEM_recv(myXmodem, HEXBUF_getBuffer(myHexbuf), 128))
-		HEXBUF_start(myHexbuf);
+	while (flg == 2);
 
 	WDOG_reset();
+}
+
+/*
+ * Example routine to update remote controller via eCAN with Xmodem source over SCI-A
+ */
+void MY_ecan_send()
+{
+	CANBUF_Handle myCanbuf;
+	XMODEM_Handle myXmodem;
+
+	myCanbuf = CANBUF_init(&ECanaRegs, CANBUF_Mode_Send, 0x400);
+	myXmodem = XMODEM_init(mySci);
+
+	XMODEM_setReader(myXmodem, CANBUF_reader, (long)myCanbuf);
+	XMODEM_setEnd(myXmodem, CANBUF_end, (long)myCanbuf);
+	scia_printf("\r\necan_send=%d\r\n", XMODEM_recv(myXmodem, NULL, 128));
 }
 
 void main()
