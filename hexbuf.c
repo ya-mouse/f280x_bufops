@@ -151,15 +151,12 @@ int HEXBUF_reader(long data, int *buffer, int len)
     			}
     			break;
 
-	    	case 'D':
-    			if (len < 4)
-    				goto copy_buf;
     		case 'A':
+	    	case 'D':
     		case 'E':
     			/* Not enough buffer input is available, request more */
     			if (len < 5)
 	    		{
-copy_buf:
 					memset(bufobj->buffer, '\0', 5);
     				xmemcpy(bufobj->buffer+(4-len), p, len+1);
     				goto next_buf;
