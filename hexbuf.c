@@ -210,7 +210,8 @@ int HEXBUF_reader(long data, int *buffer, int len)
     						addr++;
     						break;
     					}
-    					if (addr >= FLASH_START_ADDR && addr <= FLASH_END_ADDR)
+    					if ((addr >= FLASH_START_ADDR && addr <= FLASH_END_ADDR)
+    						|| (addr >= OTP_START_ADDR && addr <= OTP_END_ADDR))
     					{
 #if HEXBUF_USE_FLASHAPI
     						/* Flush data to the Flash */

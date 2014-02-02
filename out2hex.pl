@@ -16,6 +16,7 @@ sub out2hex {
     my @a;
     my ($i, $k);
     my $csum;
+    my $skip = 0;
 
     open F, "<$f";
 
@@ -26,14 +27,15 @@ sub out2hex {
         if ($l =~ /^\$A([0-9a-f]+)/) {
             chop $l;
             $addr = hex($1);
-            printf OUT "\$A%06s\n", $1;
+            $skip = ($entry_addr == 0 && $addr >= 0x3d7800 && $addr < 0x3f8000);
+            printf OUT "\$A%06s\n", $1 unless $skip;
         } elsif ("$l" =~ /^[0-9A-F]{2} /) {
             @a = split / /, lc($l);
 
             printf OUT "\$A%06x\n", $addr if ($addr == 0);
             for ($i = 0; $i <= $#a; $i+=2, $wc++) {
-                printf OUT "%04x ", $addr if ($print_addr);
-                printf OUT "%s%s\n", $a[$i], $a[$i+1];
+                printf OUT "%04x ", $addr if ($print_addr && !$skip);
+                printf OUT "%s%s\n", $a[$i], $a[$i+1] unless $skip;
                 $addr++;
             }
         }
@@ -44,6 +46,7 @@ sub out2hex {
 my ($entry) = grep(/Entry Point:/, `$CCS_TOOLS/ofd2000 --obj_display=none,header $ARGV[0]`);
 chomp $entry;
 $entry =~ s/\s*Entry Point:\s+0x[0]{2}?([0-9a-f]+)\s*$/$1/;
+$entry_addr = hex($entry);
 
 system("$CCS_TOOLS/hex2000 -a -memwidth 16 -romwidth 16 ".$ARGV[0]);
 
